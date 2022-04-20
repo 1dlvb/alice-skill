@@ -3,12 +3,21 @@ import codecs
 import random
 import json
 
+from kinopoisk import get_genres
+from re import search
 
 app = Flask(__name__)
+
+movie_genres_path = 'movie_genres.txt'
+movie_genres_str = ",".join(i for i in get_genres(movie_genres_path))
+movie_genres_list = [i for i in get_genres(movie_genres_path)]
+print(movie_genres_list)
+where_we_were_before = 0
 
 
 # gets path to the file of answers and activation words and return lists of them
 def answers_and_requests(path):
+    """НЕ ЗАБЫТЬ ДОБАВИТЬ ВЫВОД ЖАНРА ФИЛЬМА/АКТИВАЦИОННОГО СЛОВА"""
     hello_words, goodbye_words, act_movies_words, movie_genres = [], [], [], []
 
     with codecs.open(path, 'r', encoding='utf-8') as f:
@@ -35,10 +44,14 @@ def answers_and_requests(path):
     return hello_words, goodbye_words, act_movies_words, movie_genres
 
 
+# answers_and_requests('answers_and_activation_words.txt')
+
+
 def act_movie_checker(text, act_movies, movie_genres):
     movie_act_word_in_req = False
     movie_genre_in_req = False
     full_req = False
+    genre = None
 
     # checking for the presence of some movie activation word in user request
     for act_movie in act_movies:
@@ -50,17 +63,20 @@ def act_movie_checker(text, act_movies, movie_genres):
     for movie_genre in movie_genres:
         if movie_genre in text:
             movie_genre_in_req = True
+            genre = movie_genre
             print(f'movie genre: {movie_genre}')
 
     # checking for full user request
     if movie_genre_in_req is True and movie_act_word_in_req is True:
         full_req = True
-    return movie_act_word_in_req, movie_genre_in_req, full_req
+    return movie_act_word_in_req, movie_genre_in_req, full_req, genre
 
 
 @app.route('/alice', methods=['POST'])
 def resp():
     text = request.json.get('request', {}).get('command')
+    # say_hl = True
+
     end = False
 
     # possible user requests and alice answers
@@ -72,6 +88,8 @@ def resp():
                       'добрый вечер', 'добрый день', 'доброе утро']
 
     is_full_movie_req = act_movie_checker(text=text, act_movies=act_movies, movie_genres=movie_genres)
+    specified_genre = is_full_movie_req[3]
+    print(f'specified genre {specified_genre}')
     print(is_full_movie_req)
 
     # checking for a goodbye request
@@ -91,12 +109,24 @@ def resp():
 
     # if only the genre value is set in the request -> elif will return func only for a genres
     elif is_full_movie_req[1] is True:
+        for mg_item in movie_genres_list:
+            if specified_genre in mg_item:
+                print(f'You chose {mg_item} genre')
+                genre_name = mg_item
+                break
+
+        if genre_name:
+            response_text = f'Вы хотите посмотреть список фильмов в жанре {genre_name}?'
+
+        else:
+            response_text = 'Похоже, что такого жанра нет в моем списке.'
+
         print('Show only genres func')
-        response_text = 'Show only genres func'
 
     # checking for a hello request
     elif text in hello_word_req:
         response_text = f'{random.choice(hello_answer)}'
+
     else:
         response_text = 'Скажите что-нибудь и я интересно вам отвечу!'
         # response_text = 'Извините! Я Вас не поняла, повторите пожалуйста.'
