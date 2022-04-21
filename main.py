@@ -3,15 +3,17 @@ import codecs
 import random
 import json
 
-from kinopoisk import get_genres
+from kinopoisk import ShowMovies
 from re import search
 
 app = Flask(__name__)
 
+
+sm = ShowMovies()
 movie_genres_path = 'movie_genres.txt'
-movie_genres_str = ",".join(i for i in get_genres(movie_genres_path))
-movie_genres_list = [i for i in get_genres(movie_genres_path)]
-print(movie_genres_list)
+movie_genres_str = ",".join(i for i in sm.get_genres(movie_genres_path))
+movie_genres_list = [i for i in sm.get_genres(movie_genres_path)]
+# print(movie_genres_list)
 where_we_were_before = 0
 
 
@@ -75,9 +77,9 @@ def act_movie_checker(text, act_movies, movie_genres):
 @app.route('/alice', methods=['POST'])
 def resp():
     text = request.json.get('request', {}).get('command')
-    # say_hl = True
-
     end = False
+    movie = []
+    response_movies = []
 
     # possible user requests and alice answers
     hello_answer, bye_answer, act_movies, movie_genres = answers_and_requests('answers_and_activation_words.txt')
@@ -111,15 +113,26 @@ def resp():
     elif is_full_movie_req[1] is True:
         for mg_item in movie_genres_list:
             if specified_genre in mg_item:
-                print(f'You chose {mg_item} genre')
                 genre_name = mg_item
+                print(f'You chose {genre_name} genre')
+
+                # gets list of movies and chooses random value of movies from 1 to 5
+                movies = sm.get_list_of_movies(genre_name)
+                for item in movies:
+                    movie.append(item)
+                for i in movie[1: random.randint(2, 5)]:
+                    # if i.name_ru == '':
+                    #     continue
+                    response_movies.append(i.name_ru)
+
+                response_text = '\n '.join(response_movies)
                 break
 
-        if genre_name:
-            response_text = f'Вы хотите посмотреть список фильмов в жанре {genre_name}?'
+        # if genre_name:
+        #     response_text = f'Вы хотите посмотреть список фильмов в жанре {genre_name}?'
 
-        else:
-            response_text = 'Похоже, что такого жанра нет в моем списке.'
+        # else:
+        #     response_text = 'Похоже, что такого жанра нет в моем списке.'
 
         print('Show only genres func')
 

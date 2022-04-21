@@ -6,57 +6,33 @@ from kinopoisk_unofficial.request.films.filters_request import FiltersRequest
 
 from decouple import config as cfg
 import codecs
+from random import randint
 
-api_client = KinopoiskApiClient(cfg("API_TOKEN"))
+api_client = KinopoiskApiClient(cfg("API_TOKEN2"))
 path_for_genres_file = 'movie_genres.txt'
 
-# request = FilmSearchByFiltersRequest()
-# request.genres = ['боевик', ]
-# request.order = FilterOrder.RATING
-# request.add_country(FilterCountry(1, 'США'))
 
-# response = api_client.films.send_film_search_by_filters_request(request)
-# print(response)
+class ShowMovies:
+    # returns name of genres from txt file
+    def get_genres(self, path):
+        with codecs.open(path, 'r', encoding='utf-8') as f:
+            return [i[:-2] for i in f]
 
+    # returns generator type of movies
+    def get_list_of_movies(self, genre_name, rating_from=7, year_from=1900):
+        request = FilmSearchByFiltersRequest()
+        request.year_from = year_from
+        request.rating_from = rating_from
+        request.order = FilterOrder.NUM_VOTE
 
-def get_genres(path):
-    with codecs.open(path, 'r', encoding='utf-8') as f:
-        return [i[:-2] for i in f]
+        try:
+            request.page = randint(1, 15)
+        except:
+            request.page = randint(1, 5)
 
+        response = api_client.films.send_film_search_by_filters_request(request)
 
-# print(get_genres(path='movie_genres.txt'))
-
-
-# returns the id of a chosen genre from a genre name
-def get_genre_id(name):
-    try:
-        request = FiltersRequest()
-        response = api_client.films.send_filters_request(request)
-    except:
-        return None
-    if name in get_genres(path_for_genres_file):
-        for item in response.genres:
-            if name == item.genre:
-                return item
-
-        # print(response.genres.FilterGenre.(name))
-        print(f'you chose {name} genre!')
-
-
-def get_list_of_movies(genre_name, rating_from=7, year_from=1900):
-    request = FilmSearchByFiltersRequest()
-    request.year_from = year_from
-    request.rating_from = rating_from
-    request.add_genre(get_genre_id(genre_name))
-    request.order = FilterOrder.NUM_VOTE
-
-    response = api_client.films.send_film_search_by_filters_request(request)
-
-    for i in response.items:
-        if i.name_ru is not None:
-            print(i.name_ru)
-        else:
-            print(i.name_original)
-
-
-get_list_of_movies('драма', year_from=2022)
+        genre = response.items[0].genres[0].__class__(genre=genre_name)  # топорно, но должно сработать
+        for film in response.items:
+            if genre in film.genres:
+                yield film
