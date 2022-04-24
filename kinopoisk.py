@@ -8,7 +8,7 @@ from decouple import config as cfg
 import codecs
 from random import randint
 
-api_client = KinopoiskApiClient(cfg("API_TOKEN2"))
+api_client = KinopoiskApiClient(cfg("API_TOKEN"))
 path_for_genres_file = 'movie_genres.txt'
 
 
