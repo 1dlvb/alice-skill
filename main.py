@@ -13,13 +13,12 @@ sm = ShowMovies()
 movie_genres_path = 'movie_genres.txt'
 movie_genres_str = ",".join(i for i in sm.get_genres(movie_genres_path))
 movie_genres_list = [i for i in sm.get_genres(movie_genres_path)]
-# print(movie_genres_list)
 where_we_were_before = 0
 
 
 # gets path to the file of answers and activation words and return lists of them
 def answers_and_requests(path):
-    """НЕ ЗАБЫТЬ ДОБАВИТЬ ВЫВОД ЖАНРА ФИЛЬМА/АКТИВАЦИОННОГО СЛОВА"""
+
     hello_words, goodbye_words, act_movies_words, movie_genres = [], [], [], []
 
     with codecs.open(path, 'r', encoding='utf-8') as f:
@@ -46,7 +45,6 @@ def answers_and_requests(path):
     return hello_words, goodbye_words, act_movies_words, movie_genres
 
 
-# answers_and_requests('answers_and_activation_words.txt')
 
 
 def act_movie_checker(text, act_movies, movie_genres):
@@ -116,23 +114,34 @@ def resp():
                 genre_name = mg_item
                 print(f'You chose {genre_name} genre')
 
-                # gets list of movies and chooses random value of movies from 1 to 5
                 movies = sm.get_list_of_movies(genre_name)
+                print(movies)
                 for item in movies:
-                    movie.append(item)
-                for i in movie[1: random.randint(2, 5)]:
-                    # if i.name_ru == '':
-                    #     continue
-                    response_movies.append(i.name_ru)
+                    if item:
+                        movie.append(item)
+                    else:
+                        print('error')
 
-                response_text = '\n '.join(response_movies)
-                break
+                if len(movie) == 1:
+                    for i in movie:
+                        print(i.name_ru)
+                        response_movies.append(i.name_ru)
+                    response_text = '\n '.join(response_movies)
+                    break
+                elif len(movie) > 2:
+                    for i in movie[1: 4]:
+                        print(i.name_ru)
+                        response_movies.append(i.name_ru)
+                    response_text = '\n '.join(response_movies)
+                    break
 
-        # if genre_name:
-        #     response_text = f'Вы хотите посмотреть список фильмов в жанре {genre_name}?'
+                else:
+                    response_text = 'Изините! У меня возникла какая-то ошибка!' \
+                                    ' Попробуйте пока выбрать что-нибудь другое!'
+                    break
 
-        # else:
-        #     response_text = 'Похоже, что такого жанра нет в моем списке.'
+        else:
+            response_text = 'Похоже, что такого жанра нет в моем списке.'
 
         print('Show only genres func')
 
@@ -141,7 +150,7 @@ def resp():
         response_text = f'{random.choice(hello_answer)}'
 
     else:
-        response_text = 'Скажите что-нибудь и я интересно вам отвечу!'
+        response_text = 'Скажите что-нибудь интересное, и я вам как-нибудь интересно отвечу!'
         # response_text = 'Извините! Я Вас не поняла, повторите пожалуйста.'
 
     response = {
