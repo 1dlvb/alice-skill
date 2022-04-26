@@ -81,7 +81,7 @@ def resp():
     hello_answer, bye_answer, act_movies, movie_genres = answers_and_requests('answers_and_activation_words.txt')
 
     bye_word_req = ['пока', 'пока-пока', 'покеда', 'до встречи', 'до скорых встреч', 'ну все, пока', 'выход',
-                    'выйти', 'все пока']
+                    'выйти', 'все пока', 'пока...']
     hello_word_req = ['привет', 'Здравсвуйте', 'здравствуй', 'привет-привет', 'приветик', 'здорова',
                       'добрый вечер', 'добрый день', 'доброе утро']
 
@@ -128,9 +128,15 @@ def resp():
                         oauth_token=cfg("YANDEX_AUTH_TOKEN"),
                         image_path_or_url=movie_img_url,
                     )
-                    title = i.name_ru
-                    description = i.rating_imdb
-                    response_text = "Связываюсь с сервером... Передаю запрос... Жду ответ... Готово! Чтобы продолжить, скажите «Дальше».",
+                    m_title = i.name_ru
+                    m_rating = i.rating_imdb
+                    print(i.type.name)
+                    if i.type.name == 'FILM':
+                        m_type = 'фильм'
+                    elif i.type.name == 'TV_SERIES':
+                        m_type = 'сериал'
+
+                    response_text = 'Связываюсь с сервером... Передаю запрос... Жду ответ... Готово!'
 
                     break
                 else:
@@ -139,7 +145,7 @@ def resp():
                     break
 
         else:
-            response_text = 'Похоже, что такого жанра нет в моем списке.'
+            response_text = 'Похоже, что такого жанра пока нет в моем списке.'
 
         print('Show only genres func')
 
@@ -155,8 +161,8 @@ def resp():
         response = {
             'response': {
                 'text': response_text,
-                "tts": "Связываюсь с сервером... sil <[1500]> Передаю запрос... sil <[1500]> Жду ответ... " \
-                              "sil <[1500]> Готово! Чтобы продолжить, скажите «Дальше».",
+                "tts": f"Связываюсь с сервером... sil <[1700]>  Жду ответ... sil <[1700]>"
+                       f" Готово! sil <[800]> Попробуйте глянуть {m_title}. По данным Ай Эм Ди Би этот {m_type} набрал {m_rating} баллов!",
                 'buttons': [
                     {'title': 'Привет!', 'hide': True},
                     {'title': 'Я хочу посмотреть фильм!', 'hide': True},
@@ -165,8 +171,8 @@ def resp():
                 'card': {
                     'type': "BigImage",
                     'image_id': movie_img['image']['id'],
-                    'title': title,
-                    'description': f'Рейтинг на IMDB: {description}',
+                    'title': m_title,
+                    'description': f'Рейтинг на IMDB: {m_rating}',
 
                 },
                 'end_session': end,
