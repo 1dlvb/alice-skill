@@ -1,7 +1,5 @@
 from flask import Flask, request
-import codecs
 import random
-import json
 
 from kinopoisk import ShowMovies
 from decouple import config as cfg
@@ -29,7 +27,6 @@ def act_movie_checker(text, act_movies, movie_genres):
         if movie_genre in text:
             movie_genre_in_req = True
             genre = movie_genre
-            print(genre)
 
     return movie_genre_in_req,  genre
 
@@ -39,6 +36,7 @@ def resp():
     text = request.json.get('request', {}).get('command')
     end = False
     movie_img = None
+    genre_name = None
 
     # possible user requests and alice answers
     bye_word_req = ['пока', 'пока-пока', 'покеда', 'до встречи', 'до скорых встреч', 'ну все, пока', 'выход',
@@ -55,33 +53,33 @@ def resp():
 
     # if only the genre value is set in the request -> elif will return func only for a genres
     elif act_movie_checker(text=text, act_movies=act_movies_words, movie_genres=genres)[0] is True:
-        for mg_item in genre_list:
-            if specified_genre in mg_item:
-                genre_name = mg_item
+        for genre in genre_list:
+            if specified_genre in genre:
+                genre_name = genre
 
-                movies = sm.get_list_of_movies(genre_name)
-                for item in movies:
-                    movie_img_url = item.poster_url_preview
-                    movie_img = upload_image(
-                        skill_id=cfg('SKILL_ID'),
-                        oauth_token=cfg("YANDEX_AUTH_TOKEN"),
-                        image_path_or_url=movie_img_url,
-                    )
-                    m_title = item.name_ru
-                    m_rating = item.rating_imdb
-                    if item.type.name == 'FILM':
-                        m_type = 'фильм'
-                    elif item.type.name == 'TV_SERIES':
-                        m_type = 'сериал'
-                    response_text = 'Связываюсь с сервером... Передаю запрос... Жду ответ... Готово!'
-                    break
-                else:
-                    response_text = 'Извините! У меня возникла какая-то ошибка!' \
-                                    ' Попробуйте пока выбрать что-нибудь другое!'
-                    break
+        if genre_name is None:
+            response_text = 'Похоже, что такого жанра нет в моём списке!'
 
-        else:
-            response_text = 'Похоже, что такого жанра нет в моем списке.'
+        movies = sm.get_list_of_movies(genre_name)
+        for item in movies:
+            movie_img_url = item.poster_url_preview
+            movie_img = upload_image(
+                skill_id=cfg('SKILL_ID'),
+                oauth_token=cfg("YANDEX_AUTH_TOKEN"),
+                image_path_or_url=movie_img_url,
+            )
+            m_title = item.name_ru
+            m_rating = item.rating_kinopoisk
+            if item.type.name == 'FILM':
+                m_type = 'фильм'
+            elif item.type.name == 'TV_SERIES':
+                m_type = 'сериал'
+
+                response_text = 'Кажется я нашла, что же вам посмотреть!'
+            else:
+                response_text = 'Извините, произошла какая-то ошибка.'
+            break
+        response_text = 'Похоже, что возникла какая-то ошибка! Попробуйте какой-нибудь другой жанр.'
 
     # checking for a hello request
     elif text in hello_word_req:
@@ -94,8 +92,8 @@ def resp():
         response = {
             'response': {
                 'text': response_text,
-                "tts": f"Связываюсь с сервером... sil <[1700]>  Жду ответ... sil <[1700]>"
-                       f" Готово! sil <[800]> Попробуйте глянуть {m_title}. По данным Ай Эм Ди Би этот {m_type}"
+                "tts": f"Ищу, что же вам посмотреть... sil <[1700]>  Уже почти нашла... sil <[1700]>"
+                       f" Готово! sil <[950]> Попробуйте глянуть {m_title}. По данным Кинопоика этот {m_type}"
                        f" набрал {m_rating} баллов!",
                 'buttons': [
                     {'title': 'Привет!', 'hide': True},
