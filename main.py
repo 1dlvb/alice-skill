@@ -4,22 +4,21 @@ import random
 import json
 
 from kinopoisk import ShowMovies
-from re import search
+from decouple import config as cfg
+from alice_images import upload_image
+
 
 app = Flask(__name__)
-
 
 sm = ShowMovies()
 movie_genres_path = 'movie_genres.txt'
 movie_genres_str = ",".join(i for i in sm.get_genres(movie_genres_path))
 movie_genres_list = [i for i in sm.get_genres(movie_genres_path)]
-# print(movie_genres_list)
-where_we_were_before = 0
 
 
 # gets path to the file of answers and activation words and return lists of them
 def answers_and_requests(path):
-    """НЕ ЗАБЫТЬ ДОБАВИТЬ ВЫВОД ЖАНРА ФИЛЬМА/АКТИВАЦИОННОГО СЛОВА"""
+
     hello_words, goodbye_words, act_movies_words, movie_genres = [], [], [], []
 
     with codecs.open(path, 'r', encoding='utf-8') as f:
@@ -46,9 +45,6 @@ def answers_and_requests(path):
     return hello_words, goodbye_words, act_movies_words, movie_genres
 
 
-# answers_and_requests('answers_and_activation_words.txt')
-
-
 def act_movie_checker(text, act_movies, movie_genres):
     movie_act_word_in_req = False
     movie_genre_in_req = False
@@ -66,7 +62,7 @@ def act_movie_checker(text, act_movies, movie_genres):
         if movie_genre in text:
             movie_genre_in_req = True
             genre = movie_genre
-            print(f'movie genre: {movie_genre}')
+            # print(f'movie genre: {movie_genre}')
 
     # checking for full user request
     if movie_genre_in_req is True and movie_act_word_in_req is True:
@@ -79,7 +75,7 @@ def resp():
     text = request.json.get('request', {}).get('command')
     end = False
     movie = []
-    response_movies = []
+    movie_img = None
 
     # possible user requests and alice answers
     hello_answer, bye_answer, act_movies, movie_genres = answers_and_requests('answers_and_activation_words.txt')
@@ -91,8 +87,8 @@ def resp():
 
     is_full_movie_req = act_movie_checker(text=text, act_movies=act_movies, movie_genres=movie_genres)
     specified_genre = is_full_movie_req[3]
-    print(f'specified genre {specified_genre}')
-    print(is_full_movie_req)
+    # print(f'specified genre {specified_genre}')
+    # print(is_full_movie_req)
 
     # checking for a goodbye request
     if text in bye_word_req:
@@ -114,25 +110,36 @@ def resp():
         for mg_item in movie_genres_list:
             if specified_genre in mg_item:
                 genre_name = mg_item
-                print(f'You chose {genre_name} genre')
+                # print(f'You chose {genre_name} genre')
 
-                # gets list of movies and chooses random value of movies from 1 to 5
                 movies = sm.get_list_of_movies(genre_name)
                 for item in movies:
-                    movie.append(item)
-                for i in movie[1: random.randint(2, 5)]:
-                    # if i.name_ru == '':
-                    #     continue
-                    response_movies.append(i.name_ru)
+                    if item:
+                        movie.append(item)
+                    else:
+                        print('error')
 
-                response_text = '\n '.join(response_movies)
-                break
+                for i in movie:
 
-        # if genre_name:
-        #     response_text = f'Вы хотите посмотреть список фильмов в жанре {genre_name}?'
+                    print(i.name_ru)
+                    movie_img_url = i.poster_url_preview
+                    movie_img = upload_image(
+                        skill_id=cfg('SKILL_ID'),
+                        oauth_token=cfg("YANDEX_AUTH_TOKEN"),
+                        image_path_or_url=movie_img_url,
+                    )
+                    title = i.name_ru
+                    description = i.rating_imdb
+                    response_text = "Связываюсь с сервером... Передаю запрос... Жду ответ... Готово! Чтобы продолжить, скажите «Дальше».",
 
-        # else:
-        #     response_text = 'Похоже, что такого жанра нет в моем списке.'
+                    break
+                else:
+                    response_text = 'Извините! У меня возникла какая-то ошибка!' \
+                                    ' Попробуйте пока выбрать что-нибудь другое!'
+                    break
+
+        else:
+            response_text = 'Похоже, что такого жанра нет в моем списке.'
 
         print('Show only genres func')
 
@@ -141,21 +148,46 @@ def resp():
         response_text = f'{random.choice(hello_answer)}'
 
     else:
-        response_text = 'Скажите что-нибудь и я интересно вам отвечу!'
+        response_text = 'Скажите что-нибудь интересное, и я вам как-нибудь интересно отвечу!'
         # response_text = 'Извините! Я Вас не поняла, повторите пожалуйста.'
 
-    response = {
-        'response': {
-            'text': response_text,
-            'buttons': [
-                {'title': 'Привет!', 'hide': True},
-                {'title': 'Я хочу посмотреть фильм!', 'hide': True},
-                {'title': 'Пока!', 'hide': True},
-            ],
-            'end_session': end,
-        },
-        'version': '1.0'
-    }
+    if movie_img:
+        response = {
+            'response': {
+                'text': response_text,
+                "tts": "Связываюсь с сервером... sil <[1500]> Передаю запрос... sil <[1500]> Жду ответ... " \
+                              "sil <[1500]> Готово! Чтобы продолжить, скажите «Дальше».",
+                'buttons': [
+                    {'title': 'Привет!', 'hide': True},
+                    {'title': 'Я хочу посмотреть фильм!', 'hide': True},
+                    {'title': 'Пока!', 'hide': True},
+                ],
+                'card': {
+                    'type': "BigImage",
+                    'image_id': movie_img['image']['id'],
+                    'title': title,
+                    'description': f'Рейтинг на IMDB: {description}',
+
+                },
+                'end_session': end,
+            },
+            'version': '1.0'
+        }
+
+    else:
+        response = {
+            'response': {
+                'text': response_text,
+                'buttons': [
+                    {'title': 'Привет!', 'hide': True},
+                    {'title': 'Я хочу посмотреть фильм!', 'hide': True},
+                    {'title': 'Пока!', 'hide': True},
+                ],
+
+                'end_session': end,
+            },
+            'version': '1.0'
+        }
     return response
 
 
