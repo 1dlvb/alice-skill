@@ -37,6 +37,7 @@ def act_movie_checker(text, act_movies, movie_genres):
 def resp():
     text = request.json.get('request', {}).get('command')
 
+    # screen checker
     try:
         user_screen = request.json['meta']['interfaces']['screen']
         is_user_have_screen = True
@@ -70,6 +71,7 @@ def resp():
         if genre_name is None:
             response_text = 'Похоже, что такого жанра нет в моём списке!'
 
+        # show movie section
         movie = sm.get_list_of_movies(genre_name)
         try:
             movie_img = upload_image(
@@ -92,6 +94,7 @@ def resp():
     elif text in hello_word_req:
         response_text = f'{random.choice(hello_answer)}'
 
+    # checking for misunderstands
     elif text:
         response_text = misunderstands[random.randint(0, len(misunderstands)-1)]
 
