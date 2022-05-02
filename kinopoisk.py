@@ -1,52 +1,34 @@
 from kinopoisk_unofficial.kinopoisk_api_client import KinopoiskApiClient
-from kinopoisk_unofficial.model.filter_country import FilterCountry
 from kinopoisk_unofficial.model.filter_order import FilterOrder
 from kinopoisk_unofficial.request.films.film_search_by_filters_request import FilmSearchByFiltersRequest
-from kinopoisk_unofficial.request.films.filters_request import FiltersRequest
+from kinopoisk_unofficial.request.films.film_video_request import FilmVideoRequest
+
 
 from decouple import config as cfg
-import codecs
+from random import randint
 
 api_client = KinopoiskApiClient(cfg("API_TOKEN"))
-path_for_genres_file = 'movie_genres.txt'
-#
-# request = FilmSearchByFiltersRequest()
-# request.genres = ['боевик', ]
-# request.order = FilterOrder.RATING
-# request.add_country(FilterCountry(1, 'США'))
-
-# response = api_client.films.send_film_search_by_filters_request(request)
-# print(response)
 
 
-def answers_and_requests(path):
-    """НЕ ЗАБЫТЬ ДОБАВИТЬ ВЫВОД ЖАНРА ФИЛЬМА/АКТИВАЦИОННОГО СЛОВА"""
-    hello_words, goodbye_words, act_movies_words, movie_genres = [], [], [], []
+def get_list_of_movies(genre_name):
+    request = FilmSearchByFiltersRequest()
+    request.order = FilterOrder.NUM_VOTE
 
-    with codecs.open(path, 'r', encoding='utf-8') as f:
-        for i in f:
-            if i.split('1')[0] == '':
-                movie_genres.append(i.split('1')[1])
+    request.page = randint(1, 10)
+    response = api_client.films.send_film_search_by_filters_request(request)
+    for i in range(len(response.items)):
+        for k in range(len(response.items[i].genres)):
+            genre = response.items[i].genres[k].__class__(genre_name)
 
-        # deleting useless characters
-        for i in range(len(movie_genres)):
-            movie_genres[i] = movie_genres[i][:-2]
+    for film in response.items:
+        if genre in film.genres:
+            return film.kinopoisk_id
 
-    return movie_genres
-
-
-def get_genres(path):
-    with codecs.open(path, 'r', encoding='utf-8') as f:
-        return [i[:-2] for i in f]
-
-
-# print(get_genres(path='movie_genres.txt'))
-# request = FiltersRequest()
-# response = api_client.films.send_filters_request(request)
-
-
-def get_genre_id(name):
-    if name in get_genres(path_for_genres_file):
-        print(f'you chose {name} genre!')
-
-get_genre_id('драму')
+# get trailer of the movie
+def get_trailer(movie_id):
+    request = FilmVideoRequest(movie_id)
+    response = api_client.films.send_film_video_request(request)
+    for i in response.items:
+        if ('Трейлер (русский язык)' in i.name) or ('Трейлер (дублированный)' in i.name):
+            if 'widgets.kinopoisk.ru' in i.url or 'www.youtube.com' in i.url:
+                return i.url

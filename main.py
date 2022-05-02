@@ -1,149 +1,181 @@
 from flask import Flask, request
-import codecs
 import random
-import json
+from gevent.pywsgi import WSGIServer
 
-from kinopoisk import get_genres
-from re import search
+from decouple import config as cfg
+from alice_images import upload_image
+from act_dict import base_dict
+
+# imports for kinopoisk
+from kinopoisk_unofficial.kinopoisk_api_client import KinopoiskApiClient
+from kinopoisk_unofficial.model.filter_order import FilterOrder
+from kinopoisk_unofficial.request.films.film_search_by_filters_request import FilmSearchByFiltersRequest
+
+api_client = KinopoiskApiClient(cfg("API_TOKEN2"))
+
+
+# get movie from kinopoisk
+def get_movie(genre_name):
+    request = FilmSearchByFiltersRequest()
+    request.order = FilterOrder.NUM_VOTE
+
+    request.page = random.randint(1, 10)
+    response = api_client.films.send_film_search_by_filters_request(request)
+    for i in range(len(response.items)):
+        for k in range(len(response.items[i].genres)):
+            genre = response.items[i].genres[k].__class__(genre_name)
+
+    for film in response.items:
+        if genre in film.genres:
+            return film
+
 
 app = Flask(__name__)
 
-movie_genres_path = 'movie_genres.txt'
-movie_genres_str = ",".join(i for i in get_genres(movie_genres_path))
-movie_genres_list = [i for i in get_genres(movie_genres_path)]
-print(movie_genres_list)
-where_we_were_before = 0
+word_list = base_dict()
+hello_answer = word_list['hello_words']
+bye_answer = word_list['bye_words']
+genres = word_list['movie_short_genres']  # корни жанров фильмов
+genre_list = word_list['movie_genres']  # жанры
+genre_error = word_list['genre_error']  # ошибка жанров
+hello_word_req = word_list['hello_words_from_user']  # возможные слова приветствия от юзера
+goodbye_word_req = word_list['goodbye_words_from_user']  # возможные слова прощания от юзера
+misunderstands = word_list['misunderstands']  # слова недопонимания
 
 
-# gets path to the file of answers and activation words and return lists of them
-def answers_and_requests(path):
-    """НЕ ЗАБЫТЬ ДОБАВИТЬ ВЫВОД ЖАНРА ФИЛЬМА/АКТИВАЦИОННОГО СЛОВА"""
-    hello_words, goodbye_words, act_movies_words, movie_genres = [], [], [], []
-
-    with codecs.open(path, 'r', encoding='utf-8') as f:
-        for i in f:
-            if i.split('/')[0] == '':
-                hello_words.append(i.split('/')[1])
-            if i.split('*')[0] == '':
-                goodbye_words.append(i.split('*')[1])
-            if i.split('~')[0] == '':
-                act_movies_words.append(i.split('~')[1])
-            if i.split('1')[0] == '':
-                movie_genres.append(i.split('1')[1])
-
-        # deleting useless characters
-        for i in range(len(hello_words)):
-            hello_words[i] = hello_words[i][:-2]
-        for i in range(len(goodbye_words)):
-            goodbye_words[i] = goodbye_words[i][:-2]
-        for i in range(len(act_movies_words)):
-            act_movies_words[i] = act_movies_words[i][:-2]
-        for i in range(len(movie_genres)):
-            movie_genres[i] = movie_genres[i][:-2]
-
-    return hello_words, goodbye_words, act_movies_words, movie_genres
-
-
-# answers_and_requests('answers_and_activation_words.txt')
-
-
-def act_movie_checker(text, act_movies, movie_genres):
-    movie_act_word_in_req = False
+def act_movie_checker(text, movie_genres):
     movie_genre_in_req = False
-    full_req = False
     genre = None
-
-    # checking for the presence of some movie activation word in user request
-    for act_movie in act_movies:
-        if act_movie in text:
-            print(f'act movie: {act_movie}')
-            movie_act_word_in_req = True
 
     # checking for the presence of some movie genre activation word in the user request
     for movie_genre in movie_genres:
         if movie_genre in text:
             movie_genre_in_req = True
             genre = movie_genre
-            print(f'movie genre: {movie_genre}')
 
-    # checking for full user request
-    if movie_genre_in_req is True and movie_act_word_in_req is True:
-        full_req = True
-    return movie_act_word_in_req, movie_genre_in_req, full_req, genre
+    return movie_genre_in_req,  genre
 
 
 @app.route('/alice', methods=['POST'])
 def resp():
     text = request.json.get('request', {}).get('command')
-    # say_hl = True
+
+    # screen checker
+    try:
+        user_screen = request.json['meta']['interfaces']['screen']
+        is_user_have_screen = True
+    except KeyError:
+        is_user_have_screen = False
 
     end = False
+    movie_img = None
+    genre_name = None
 
-    # possible user requests and alice answers
-    hello_answer, bye_answer, act_movies, movie_genres = answers_and_requests('answers_and_activation_words.txt')
-
-    bye_word_req = ['пока', 'пока-пока', 'покеда', 'до встречи', 'до скорых встреч', 'ну все, пока', 'выход',
-                    'выйти', 'все пока']
-    hello_word_req = ['привет', 'Здравсвуйте', 'здравствуй', 'привет-привет', 'приветик', 'здорова',
-                      'добрый вечер', 'добрый день', 'доброе утро']
-
-    is_full_movie_req = act_movie_checker(text=text, act_movies=act_movies, movie_genres=movie_genres)
-    specified_genre = is_full_movie_req[3]
-    print(f'specified genre {specified_genre}')
-    print(is_full_movie_req)
+    specified_genre = act_movie_checker(text=text, movie_genres=genres)[-1]
 
     # checking for a goodbye request
-    if text in bye_word_req:
+    if text in goodbye_word_req:
         response_text = f'{random.choice(bye_answer)}'
         end = True
 
-    # if movie request is fully filled (with genres and movie act. word) -> elif will return the movie and genres func
-    elif is_full_movie_req[2] is True:
-        print('Show movie and genres func')
-        response_text = 'Show movie and genres func'
-
-    # if only the movie act. word value is set in the request -> elif will return func only for a movie act. word
-    elif is_full_movie_req[0] is True:
-        print('Show only movie func')
-        response_text = 'Show only movie func'
-
-    # if only the genre value is set in the request -> elif will return func only for a genres
-    elif is_full_movie_req[1] is True:
-        for mg_item in movie_genres_list:
-            if specified_genre in mg_item:
-                print(f'You chose {mg_item} genre')
-                genre_name = mg_item
-                break
-
-        if genre_name:
-            response_text = f'Вы хотите посмотреть список фильмов в жанре {genre_name}?'
-
+        # if only the genre value is set in the request -> elif will return func only for a genres
+    elif act_movie_checker(text=text, movie_genres=genres)[0] is True:
+        if is_user_have_screen:
+            tts_response = base_dict()['user_have_screen_resp']
+            response_text = 'Кажется нашла!'
         else:
-            response_text = 'Похоже, что такого жанра нет в моем списке.'
+            tts_response = base_dict()['user_havent_screen_resp']
+            response_text = 'Хм...'
 
-        print('Show only genres func')
+        for genre in genre_list:
+            if specified_genre in genre:
+                genre_name = genre
+
+        if genre_name is None:
+            response_text = 'Похоже, что такого жанра нет в моём списке!'
+
+        # show movie section
+        try:
+            movie = get_movie(genre_name)
+            # print(movie.name_ru)
+            # get image
+            movie_img = upload_image(
+                skill_id=cfg('SKILL_ID'),
+                oauth_token=cfg("YANDEX_AUTH_TOKEN"),
+                image_path_or_url=movie.poster_url_preview,
+            )
+
+            if movie.type.name == 'FILM':
+                m_type = 'фильм'
+            elif movie.type.name == 'TV_SERIES':
+                m_type = 'сериал'
+
+            else:
+                response_text = 'Извините, произошла какая-то ошибка.'
+        except TypeError:
+            response_text = genre_error[random.randint(0, len(genre_error)-1)]
+
+        except AttributeError:
+            response_text = genre_error[random.randint(0, len(genre_error)-1)]
 
     # checking for a hello request
     elif text in hello_word_req:
         response_text = f'{random.choice(hello_answer)}'
 
-    else:
-        response_text = 'Скажите что-нибудь и я интересно вам отвечу!'
-        # response_text = 'Извините! Я Вас не поняла, повторите пожалуйста.'
+    # checking for misunderstands
+    elif text:
+        response_text = f'{misunderstands[random.randint(0, len(misunderstands)-1)]}'
 
-    response = {
-        'response': {
-            'text': response_text,
-            'buttons': [
-                {'title': 'Привет!', 'hide': True},
-                {'title': 'Я хочу посмотреть фильм!', 'hide': True},
-                {'title': 'Пока!', 'hide': True},
-            ],
-            'end_session': end,
-        },
-        'version': '1.0'
-    }
+    else:
+        response_text = 'Привет, я посоветую тебе фильм, в зависимости от твоих жанровых предпочтений. ' \
+                            'Просто скажи, в каком жанре ты бы хотел увидеть и я найду для тебя' \
+                            ' соответствующую картину.'
+
+    if movie_img:
+        response = {
+            'response': {
+                'text': response_text,
+                "tts": f"{tts_response[random.randint(0, len(tts_response) - 1)]} Попробуйте глянуть {movie.name_ru}."
+                       f" По данным Ай Эм Ди Би этот {m_type}"
+                       f" набрал {movie.rating_imdb} баллов!",
+                'buttons': [
+                    {'title': 'Привет!', 'hide': True},
+                    {'title': 'Пока', 'hide': True},
+                ],
+                'card': {
+                    'type': "ImageGallery",
+                    'items': [
+                        {
+                            'image_id': movie_img['image']['id'],
+                            'title': f'{movie.name_ru}',
+                            'description': f'Рейтинг на IMDB: {movie.rating_imdb}',
+                        },
+
+                    ],
+
+                },
+                'end_session': end,
+            },
+            'version': '1.0'
+        }
+
+    else:
+        response = {
+            'response': {
+                'text': response_text,
+                'buttons': [
+                    {'title': 'Привет!', 'hide': True},
+                    {'title': 'Пока!', 'hide': True},
+                ],
+
+                'end_session': end,
+            },
+            'version': '1.0'
+        }
     return response
 
 
-app.run('localhost', port=5000, debug=True)
+if __name__ == '__main__':
+    app.run('localhost', port=5000, debug=True)
+    # http_server = WSGIServer(('', 5000), app)
+    # http_server.serve_forever()
