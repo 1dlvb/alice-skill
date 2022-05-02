@@ -2,12 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/KinoPoiskAPI" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/aioalice" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/alice" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/alice-skill" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/alice-skill-hackathon" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/alice_scripts" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/server" vcs="Git" />
   </component>
 </project>
