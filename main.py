@@ -11,6 +11,7 @@ from kinopoisk_unofficial.kinopoisk_api_client import KinopoiskApiClient
 from kinopoisk_unofficial.model.filter_order import FilterOrder
 from kinopoisk_unofficial.request.films.film_search_by_filters_request import FilmSearchByFiltersRequest
 
+
 api_client = KinopoiskApiClient(cfg("API_TOKEN2"))
 
 
