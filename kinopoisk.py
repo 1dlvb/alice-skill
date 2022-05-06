@@ -1,34 +1,35 @@
-from kinopoisk_unofficial.kinopoisk_api_client import KinopoiskApiClient
-from kinopoisk_unofficial.model.filter_order import FilterOrder
-from kinopoisk_unofficial.request.films.film_search_by_filters_request import FilmSearchByFiltersRequest
 from kinopoisk_unofficial.request.films.film_video_request import FilmVideoRequest
 
 
 from decouple import config as cfg
-from random import randint
+import random
+
+# imports for kinopoisk
+from kinopoisk_unofficial.request.films.filters_request import FiltersRequest
+from kinopoisk_unofficial.kinopoisk_api_client import KinopoiskApiClient
+from kinopoisk_unofficial.model.filter_order import FilterOrder
+from kinopoisk_unofficial.request.films.film_search_by_filters_request import FilmSearchByFiltersRequest
+
 
 api_client = KinopoiskApiClient(cfg("API_TOKEN"))
 
 
-def get_list_of_movies(genre_name):
+def get_movie(genre_name):
+    req_id = FiltersRequest()
+    res_id = api_client.films.send_filters_request(req_id).genres
+    genre = None
+    for item in res_id:
+        if item.genre == genre_name:
+            genre = item
+
     request = FilmSearchByFiltersRequest()
+    request.genres = [genre]
+    request.year_from = 2000
     request.order = FilterOrder.NUM_VOTE
+    request.page = random.randint(1, 20)
 
-    request.page = randint(1, 10)
     response = api_client.films.send_film_search_by_filters_request(request)
-    for i in range(len(response.items)):
-        for k in range(len(response.items[i].genres)):
-            genre = response.items[i].genres[k].__class__(genre_name)
-
-    for film in response.items:
-        if genre in film.genres:
-            return film.kinopoisk_id
-
-# get trailer of the movie
-def get_trailer(movie_id):
-    request = FilmVideoRequest(movie_id)
-    response = api_client.films.send_film_video_request(request)
-    for i in response.items:
-        if ('Трейлер (русский язык)' in i.name) or ('Трейлер (дублированный)' in i.name):
-            if 'widgets.kinopoisk.ru' in i.url or 'www.youtube.com' in i.url:
-                return i.url
+    for item in response.items:
+        for i in item.genres:
+            if genre.genre in i.genre:
+                yield item
