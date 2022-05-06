@@ -2,32 +2,10 @@ from flask import Flask, request
 import random
 from gevent.pywsgi import WSGIServer
 
+from kinopoisk import get_movie
 from decouple import config as cfg
-from alice_images import upload_image
+from alice_images import upload_image, delete_uploaded_image, uploaded_images_list
 from act_dict import base_dict
-
-# imports for kinopoisk
-from kinopoisk_unofficial.kinopoisk_api_client import KinopoiskApiClient
-from kinopoisk_unofficial.model.filter_order import FilterOrder
-from kinopoisk_unofficial.request.films.film_search_by_filters_request import FilmSearchByFiltersRequest
-
-api_client = KinopoiskApiClient(cfg("API_TOKEN2"))
-
-
-# get movie from kinopoisk
-def get_movie(genre_name):
-    request = FilmSearchByFiltersRequest()
-    request.order = FilterOrder.NUM_VOTE
-
-    request.page = random.randint(1, 10)
-    response = api_client.films.send_film_search_by_filters_request(request)
-    for i in range(len(response.items)):
-        for k in range(len(response.items[i].genres)):
-            genre = response.items[i].genres[k].__class__(genre_name)
-
-    for film in response.items:
-        if genre in film.genres:
-            return film
 
 
 app = Flask(__name__)
@@ -59,6 +37,7 @@ def act_movie_checker(text, movie_genres):
 @app.route('/alice', methods=['POST'])
 def resp():
     text = request.json.get('request', {}).get('command')
+    m_type = 'Фильм'
 
     # screen checker
     try:
@@ -78,7 +57,7 @@ def resp():
         response_text = f'{random.choice(bye_answer)}'
         end = True
 
-        # if only the genre value is set in the request -> elif will return func only for a genres
+    # if only the genre value is set in the request -> elif will return func only for a genres
     elif act_movie_checker(text=text, movie_genres=genres)[0] is True:
         if is_user_have_screen:
             tts_response = base_dict()['user_have_screen_resp']
@@ -96,15 +75,26 @@ def resp():
 
         # show movie section
         try:
-            movie = get_movie(genre_name)
-            # print(movie.name_ru)
+            l = []
+            m = get_movie(genre_name)
+            for i in m:
+                l.append(i)
+
+            try:
+                movie = l[random.randint(0, len(l)-1)]
+            except ValueError:
+                movie = None
+
             # get image
+            if movie.name_ru:
+                m_name = movie.name_ru
+            else:
+                m_name = movie.name_original
             movie_img = upload_image(
                 skill_id=cfg('SKILL_ID'),
                 oauth_token=cfg("YANDEX_AUTH_TOKEN"),
-                image_path_or_url=movie.poster_url_preview,
+                image_path_or_url=movie.poster_url,
             )
-
             if movie.type.name == 'FILM':
                 m_type = 'фильм'
             elif movie.type.name == 'TV_SERIES':
@@ -124,22 +114,31 @@ def resp():
 
     # checking for misunderstands
     elif text:
-        response_text = f'{misunderstands[random.randint(0, len(misunderstands)-1)]}'
+        if text == 'помощь':
+            response_text = 'Назовите жанр, который хотели бы увидеть.\n' \
+                            'Скажите, например, Алиса, я хочу посмотреть боевик!'
+        elif text == 'что ты умеешь' or text == 'что ты умеешь?' or text == 'что ты можешь' or text == 'что ты можешь?':
+            response_text = f'Я покажу Вам фильм, по выбранному Вами жанру. Просто назовите тот жанр, который ' \
+                            f'бы хотели посмотреть!'
+        else:
+            response_text = f'{misunderstands[random.randint(0, len(misunderstands)-1)]}'
 
     else:
         response_text = 'Привет, я посоветую тебе фильм, в зависимости от твоих жанровых предпочтений. ' \
-                            'Просто скажи, в каком жанре ты бы хотел увидеть и я найду для тебя' \
+                            'Просто скажи, в каком жанре ты бы хотел увидеть его и я найду для тебя' \
                             ' соответствующую картину.'
 
     if movie_img:
         response = {
             'response': {
                 'text': response_text,
-                "tts": f"{tts_response[random.randint(0, len(tts_response) - 1)]} Попробуйте глянуть {movie.name_ru}."
+                "tts": f"{tts_response[random.randint(0, len(tts_response) - 1)]} Попробуйте глянуть {m_name}."
                        f" По данным Ай Эм Ди Би этот {m_type}"
                        f" набрал {movie.rating_imdb} баллов!",
                 'buttons': [
                     {'title': 'Привет!', 'hide': True},
+                    {'title': 'Помощь', 'hide': True},
+                    {'title': 'Что ты умеешь?', 'hide': True},
                     {'title': 'Пока', 'hide': True},
                 ],
                 'card': {
@@ -147,12 +146,10 @@ def resp():
                     'items': [
                         {
                             'image_id': movie_img['image']['id'],
-                            'title': f'{movie.name_ru}',
+                            'title': f'{m_name}',
                             'description': f'Рейтинг на IMDB: {movie.rating_imdb}',
                         },
-
                     ],
-
                 },
                 'end_session': end,
             },
@@ -165,6 +162,8 @@ def resp():
                 'text': response_text,
                 'buttons': [
                     {'title': 'Привет!', 'hide': True},
+                    {'title': 'Помощь', 'hide': True},
+                    {'title': 'Что ты умеешь?', 'hide': True},
                     {'title': 'Пока!', 'hide': True},
                 ],
 
@@ -174,6 +173,9 @@ def resp():
         }
     return response
 
+
+for item in uploaded_images_list(skill_id=cfg('SKILL_ID'), oauth_token=cfg("YANDEX_AUTH_TOKEN"))['images']:
+    delete_uploaded_image(skill_id=cfg('SKILL_ID'), oauth_token=cfg("YANDEX_AUTH_TOKEN"), image_id=item['id'])
 
 if __name__ == '__main__':
     app.run('localhost', port=5000, debug=True)
